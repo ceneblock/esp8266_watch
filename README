@@ -1,0 +1,14 @@
+This is a "simple" esp8266 watch using NTP for dates.
+
+It requires a batch of suplemental libraries that I'll eventually replace.
+
+I've tested it on a LinkNode D1
+(http://linksprite.com/wiki/index.php5?title=LinkNode_D1)
+
+I'll put a schematic up once everything is finished.
+
+TODO:
+
+RTC backup
+uSD for storage
+EEPROM
