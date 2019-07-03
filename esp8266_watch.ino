@@ -1,5 +1,6 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
+#include <WiFiManager.h> //https://github.com/tzapu/WiFiManager
 #include <WiFiUdp.h>
 #include <Ticker.h> 
 #include <SD.h>
@@ -9,17 +10,14 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#include <ThreeWire.h>  
-#include <RtcDS1302.h>
 #include <time.h>
 
-///This contains the network ssid and password
-#include "networkinfo.h"
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-ThreeWire myWire(4,5,2); // IO, SCLK, CE
-RtcDS1302<ThreeWire> Rtc(myWire);
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+#define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 
-const int CS_PIN = 10;
 Ticker timer;
 String display_time = "", old_display_time = "";
 
@@ -35,14 +33,6 @@ byte NTPBuffer[NTP_PACKET_SIZE]; // buffer to hold incoming and outgoing packets
 
 void updateTime();
 
-
-
-
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
-
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-#define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 /*__________________________________________________________SETUP__________________________________________________________*/
@@ -51,8 +41,6 @@ void setup() {
   Serial.begin(115200);          // Start the Serial communication to send messages to the computer
   delay(10);
   Serial.println("\r\n");
-
-   Rtc.Begin();
 
   startWiFi();                   // Try to connect to some given access points. Then wait for a connection
 
@@ -70,7 +58,7 @@ void setup() {
   Serial.println("\r\nSending NTP request ...");
   sendNTPpacket(timeServerIP);
 
-  timer.attach(1, updateTime);
+  timer.attach(.5, updateTime); //update more often than we need to
 
 
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
@@ -83,32 +71,10 @@ void setup() {
   // Show initial display buffer contents on the screen --
   // the library initializes this with an Adafruit splash screen.
   display.display();
-//  // Clear the buffer
+  // Clear the buffer
   display.clearDisplay();
   display.display();
-//
-//  // Draw a single pixel in white
-//  display.drawPixel(10, 10, WHITE);
-//
-//  // Show the display buffer on the screen. You MUST call display() after
-//  // drawing commands to make them visible on screen!
-//  display.display();
-//  delay(2000);
-  // display.display() is NOT necessary after every single drawing command,
-  // unless that's what you want...rather, you can batch up a bunch of
-  // drawing operations and then update the screen all at once by calling
-  // display.display(). These examples demonstrate both approaches...
 
-
-
-//  if(!SD.begin(CS_PIN))
-//  {
-//    Serial.println("Unable to access SD Card");
-//  }
-//  else
-//  {
-//    Serial.println("Hello SD Card!");
-//  }
 }
 
 /*__________________________________________________________LOOP__________________________________________________________*/
@@ -127,9 +93,9 @@ void loop() {
   
     display.clearDisplay();
   
-    display.setTextSize(2);             // Normal 1:1 pixel scale
-    display.setTextColor(WHITE);        // Draw white text
-    display.setCursor(0,0);             // Start at top-left corner
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
   
     display.println(" " + (display_time));
     display.display();
@@ -139,15 +105,22 @@ void loop() {
 /*__________________________________________________________SETUP_FUNCTIONS__________________________________________________________*/
 
 void startWiFi() { // Try to connect to some given access points. Then wait for a connection
-  wifiMulti.addAP(NETWORK, PASSWORD);   // add Wi-Fi networks you want to connect to
-//  wifiMulti.addAP("ssid_from_AP_2", "your_password_for_AP_2");
-//  wifiMulti.addAP("ssid_from_AP_3", "your_password_for_AP_3");
+  //WiFiManager
+  //Local intialization. Once its business is done, there is no need to keep it around
+  WiFiManager wifiManager;
+  //reset saved settings
+  //wifiManager.resetSettings();
+  //set custom ip for portal
+  wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+  
+  //fetches ssid and pass from eeprom and tries to connect
+  //if it does not connect it starts an access point with the specified name
+  //here  "AutoConnectAP"
+  //and goes into a blocking loop awaiting configuration
+  wifiManager.autoConnect("LinkNodeAP");
+  //or use this for auto generated name ESP + ChipID
+  //wifiManager.autoConnect();
 
-  Serial.println("Connecting");
-  while (wifiMulti.run() != WL_CONNECTED) {  // Wait for the Wi-Fi to connect
-    delay(250);
-    Serial.print('.');
-  }
   Serial.println("\r\n");
   Serial.print("Connected to ");
   Serial.println(WiFi.SSID());             // Tell us what network we're connected to
@@ -206,7 +179,7 @@ void updateTime()
   unsigned long currentMillis = millis();
   sendNTPpacket(timeServerIP);               // Send an NTP request
 
-  time = getTime(); //interrupt the results
+  time = getTime(); //get the results
   if (time)
   {              
     display_time = "";    
@@ -236,53 +209,6 @@ void updateTime()
   }
 }
 
-
-//#include <ESP8266WiFi.h> //https://github.com/esp8266/Arduino
-//#include <ESP8266HTTPClient.h>
-//#include <ESP8266WiFiMulti.h>
-//
-////needed for library
-//#include <DNSServer.h>
-//#include <ESP8266WebServer.h>
-//#include <WiFiManager.h> //https://github.com/tzapu/WiFiManager
-//
-//#include <WiFiUdp.h>
-//
-//void setup() {
-//  // put your setup code here, to run once:
-//  Serial.begin(115200);
-//  //WiFiManager
-//  //Local intialization. Once its business is done, there is no need to keep it around
-//  WiFiManager wifiManager;
-//  //reset saved settings
-//  //wifiManager.resetSettings();
-//  //set custom ip for portal
-//  wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
-//  
-//  //fetches ssid and pass from eeprom and tries to connect
-//  //if it does not connect it starts an access point with the specified name
-//  //here  "AutoConnectAP"
-//  //and goes into a blocking loop awaiting configuration
-//  wifiManager.autoConnect("LinkNodeAP");
-//  //or use this for auto generated name ESP + ChipID
-//  //wifiManager.autoConnect();
-//  
-//  //if you get here you have connected to the WiFi
-//  Serial.println("connected... :)");
-//
-//  
-//
-////  HTTPClient http;
-////
-////  http.begin("http://cosmic.decay.space/centurylink/");
-////
-////  int httpCode = http.GET();
-////
-////  Serial.println(httpCode);
-////  String payload = http.getString();
-////  Serial.println(payload);
-//
-//}
 //// the loop function runs over and over again forever
 //void loop() {
 //digitalWrite(BUILTIN_LED, HIGH);   // turn the LED on (HIGH is the voltage level)
