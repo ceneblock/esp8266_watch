@@ -20,7 +20,7 @@ class watch_eeprom
       bool celebrates; /// if this timezone uses DST
     }; 
    
-    watch_eeprom(unsigned int address);
+    watch_eeprom(byte address);
     tm calculate_dst_start(unsigned int year);
     tm calculate_dst_end(unsigned int year);
     
@@ -28,9 +28,15 @@ class watch_eeprom
   private:
     void setTimeZones();
   protected:
-    unsigned int address;
+    byte address;
     tm dst_begin, dst_end;
     time_zone_data_t tzd[7];
+}
+
+watch_eeprom::watch_eeprom(byte address = 0x50)
+{
+  this -> address = address;
+  setTimeZones();
 }
 
 void watch_eeprom::setTimeZones()

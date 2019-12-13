@@ -3,7 +3,7 @@
 #include <WiFiManager.h> //https://github.com/tzapu/WiFiManager
 #include <WiFiUdp.h>
 #include <Ticker.h> 
-#include <SD.h>
+//#include <SD.h>
 
 #include <SPI.h>
 #include <Wire.h>
@@ -11,6 +11,9 @@
 #include <Adafruit_SSD1306.h>
 
 #include <time.h>
+
+#include "ds3231.h"
+
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -21,7 +24,7 @@
 Ticker timer;
 String display_time = "", old_display_time = "";
 
-int offset = -5 * 60 * 60; //offset * seconds * minuets
+int offset = -6 * 60 * 60; //offset * seconds * minuets for timezone
 
 ESP8266WiFiMulti wifiMulti;      // Create an instance of the ESP8266WiFiMulti class, called 'wifiMulti'
 WiFiUDP UDP;                     // Create an instance of the WiFiUDP class to send and receive
@@ -34,6 +37,8 @@ byte NTPBuffer[NTP_PACKET_SIZE]; // buffer to hold incoming and outgoing packets
 void updateTime();
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+DS3231 ds3231;
 
 /*__________________________________________________________SETUP__________________________________________________________*/
 
@@ -57,6 +62,15 @@ void setup() {
   
   Serial.println("\r\nSending NTP request ...");
   sendNTPpacket(timeServerIP);
+
+  //Go ahead and update the RTC if possible.
+
+  tm* time = NULL;
+  time = getTime(); //get the results
+  if (time)
+  {
+
+  }
 
   timer.attach(.5, updateTime); //update more often than we need to
 
@@ -199,20 +213,32 @@ void updateTime()
      display_time +="0";
     }
     display_time +=  String(time -> tm_sec);
-  } 
+
+    ds3231.setTime(*time);
+
+    tm current_time = ds3231.getCurrentTime();
+    printf("RTC Time %s", asctime(&current_time));
+
+  }
   else if ((currentMillis - lastNTPResponse) > 3600000) 
   {
-    Serial.println("More than 1 hour since last NTP response. Rebooting.");
+    Serial.println("More than 1 hour since last NTP response. Reading from RTC.");
     Serial.flush();
-    ESP.reset();
-    display_time = "Error!";
+    tm current_time = ds3231.getCurrentTime();
+    if(time-> tm_hour < 10)
+    {
+      display_time = "0";
+    }
+    display_time += String(time -> tm_hour) + ":";
+    if(time -> tm_min < 10)
+    {
+      display_time += "0";
+    }
+    display_time += String(time -> tm_min) + ":";
+    if(time -> tm_sec < 10)
+    {
+     display_time +="0";
+    }
+    display_time +=  String(time -> tm_sec);
   }
 }
-
-//// the loop function runs over and over again forever
-//void loop() {
-//digitalWrite(BUILTIN_LED, HIGH);   // turn the LED on (HIGH is the voltage level)
-//delay(1000);              // wait for a second
-//digitalWrite(BUILTIN_LED, LOW);    // turn the LED off by making the voltage LOW
-//delay(1000);              // wait for a second
-//}
